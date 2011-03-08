@@ -1,0 +1,4 @@
+"#",,,,"States",
+"#Command","Variable Type","Aliases","Function Name","BsfDone","PbfDone"
+"batchseqfile","ASSEMBLER","bsf","AddSequenceFile","XT","FF"
+"processbatchfiles","ASSEMBLER","pbf","LoadAndProcessFiles","TT","FT"

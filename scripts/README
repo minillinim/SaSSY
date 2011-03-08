@@ -1,0 +1,10 @@
+Included in this directory are some scripts I use to filter Illumina data files before I assemble them with SaSSY.
+They are provided as is, perhaps I will include their usage in more detail in the manual later.
+
+BASIC USAGE:
+
+1 -> illqualfilter.pl: to remove evil reads
+2 -> cutDown_ILL.pl: I have found this to be more effective than simply trimming, BUT it produces A LOT of data
+3 -> remove_exact_dupes.pl: why not?
+4 -> selectRand.pl: select a number of reads from the cut down file at random. This is better than just using head
+5 -> SaSSY

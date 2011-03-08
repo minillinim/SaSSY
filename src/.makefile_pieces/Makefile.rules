@@ -1,0 +1,28 @@
+
+#-----------------------------------------#
+#------ HM FILE GENERATION ---------------#
+#-----------------------------------------#
+
+SPECCASES_H_TO_HM := ${SPECCASES_H:.h=.virt.hm}
+SPECCASES_CPP_TO_HM := ${SPECCASES_CPP:.cpp=.virt.hm}
+
+${SPECCASES_H_TO_HM}: %.virt.hm: %.h
+	@echo [---?---] Generating *.hm files for \"$<\"
+	@awk -f .makefile_pieces/makehm.awk $<
+
+${SPECCASES_CPP_TO_HM}: %.virt.hm: %.cpp
+	@echo [---?---] Generating *.hm files for \"$<\"
+	@awk -f .makefile_pieces/makehm.awk $<
+
+#-----------------------------------------#
+#------ MAIN TARGET ----------------------#
+#-----------------------------------------#
+
+${TARGET}: ${OBJS}
+	@echo [---4---] Linking target \"${TARGET}\"
+	${CC} ${LDFLAGS} -o $@ ${OBJS} ${LIBS} 
+
+#-----------------------------------------#
+#--- START AUTO GENERATED DEPENDENCIES ---#
+#-----------------------------------------#
+

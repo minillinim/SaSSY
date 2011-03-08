@@ -1,0 +1,59 @@
+## --------------------------------------------------------------------
+##
+## File format descriptor for standard fastq format (all reads in one file)
+##
+## Original Author: Dominic Eales
+##
+## --------------------------------------------------------------------
+## Copyright (C) 2009 2010 2011 Michael Imelfort and Dominic Eales
+##
+## This file is part of the Sassy Assembler Project.
+##
+## Sassy is free software: you can redistribute it and/or modify
+## it under the terms of the GNU General Public License as published by
+## the Free Software Foundation, either version 3 of the License, or
+## (at your option) any later version.
+##
+## Sassy is distributed in the hope that it will be useful,
+## but WITHOUT ANY WARRANTY; without even the implied warranty of
+## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+## GNU General Public License for more details.
+##
+## You should have received a copy of the GNU General Public License
+## along with Sassy.  If not, see <http://www.gnu.org/licenses/>.
+## --------------------------------------------------------------------
+##
+##@@ entries look like:
+##@@
+##@@ @H1USI-EAS100R:6:73:941:1973#0/1
+##@@ GATTTGGGGTTCAAAGCAGTATCGATCAAATAGTAAATCCATTTGTTCAACTCACAGTTT
+##@@ +
+##@@ !''*((((***+))%%%++)(%%%%).1***-+*''))**55CCF>>>>>>CCCCCCC65
+##@@
+##
+
+format.name = "FASTQ-singlefile"
+format.number-of-files = 1
+format.file-1-label = "FASTQ"
+format.lines-per-record = 8
+
+## "file-set-style" should be set to either ONE_PAIRED_SEQ_PER_FILE or ONE_PAIRED_SEQ_ACROSS_FILES
+## this parameter is ignored when "number-of-files" is 1
+format.file-set-style = ONE_PAIRED_SEQ_PER_FILE
+
+## Expressions For File Parsing ##
+format.common-record-expr = /@([^:@]*):([^:@]*):([^:@]*):([^:@]*):([^#@]*)#([^\/@]*)\/([^@]*)\n([^@]+)\n\+([^\n]*)\n(.+)\n/
+
+###
+output.unique-id = "UNKNOWN"
+output.instrument-name = %1.1%
+output.lane-number = %1.2%
+output.tile-number = %1.3%
+output.x-coord = %1.4%
+output.y-coord = %1.5%
+output.multiplex-index = %1.6%
+output.pair-reference = %1.7%
+output.sequence-data = %1.8%
+output.quality-data = %1.10%
+output.quality-format = "UNKNOWN"
+

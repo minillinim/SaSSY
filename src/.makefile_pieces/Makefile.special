@@ -1,0 +1,30 @@
+#----------------------------------------------
+# SPECIAL CASES
+# 
+# Add what you want but leave the new line char at the end
+# 
+#----------------------------------------------
+SPECCASES := \
+ContextMemWrapper.cpp \
+ContextClass.cpp \
+ReadStoreMemWrapper.extended.h \
+ReadStoreClass.cpp \
+KmerMapClass.cpp \
+KmerMapMemWrapper.cpp \
+KmerMatchMapClass.cpp \
+KmerMatchMapMemWrapper.cpp \
+UniNodeMemWrapper.extended.h \
+UniNodeClass.cpp \
+DualNodeMemWrapper.cpp \
+DualNodeClass.cpp \
+GenericNodeClass.cpp \
+GenericNodeMemWrapper.cpp \
+NodePositionMapMemWrapper.cpp \
+NodePositionMapClass.cpp \
+ContigMemWrapper.cpp \
+ContigClass.cpp \
+NodeCheckMemWrapper.cpp \
+NodeCheckClass.cpp \
+ReadIdentifierMemWrapper.cpp \
+ReadIdentifierClass.cpp \
+
