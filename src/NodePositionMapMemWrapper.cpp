@@ -373,7 +373,7 @@ NodePositionMapMemWrapper::
 }
 //HO 
 
-/*HV*/ void
+/*HV*/ bool
 NodePositionMapMemWrapper::
 /*HV*/ deleteElem(GenericNodeId GID)
 //HO ;
@@ -386,6 +386,7 @@ NodePositionMapMemWrapper::
     posNodeRefMultiIter posNodeIterPair;
     posNodeRefIter finder2;
     NodePositionMapId head_NPM;
+    bool erased = false;
     
     if(finder != mNodePosRef.end())
     {
@@ -398,6 +399,7 @@ NodePositionMapMemWrapper::
             if(finder2->second == GID)
             {
                 mPosNodeRef.erase(finder2);
+                erased = true;
                 break;
             }
             finder2++;
@@ -411,6 +413,7 @@ NodePositionMapMemWrapper::
             if(finder2->second == GID)
             {
                 mPosNodeRef.erase(finder2);
+                erased = true;
                 break;
             }
             finder2++;
@@ -425,6 +428,8 @@ NodePositionMapMemWrapper::
     }
     else
         logError(GID << " not found");
+    
+    return erased;
 }
 //HO 
 

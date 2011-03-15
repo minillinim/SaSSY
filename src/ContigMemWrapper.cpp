@@ -1225,13 +1225,6 @@ ContigMemWrapper::
         tmp_str = mNodes->getSequence(start_GID);
         
         offset = mNodes->getOffset(walking_edge);
-
-        
-        if(mNc == DUALNODE)
-        {
-            std::cout << mNodes->getCntxId(start_GID) << " : " << offset << " : " << mNodes->getSequence(start_GID) << " --> " << mNodes->getSequence(next_start_GID) << std::endl;
-            std::cout << mNodes->getNtOffset(DUALNODE, next_start_GID, start_GID) << " : " << mNodes->getNtOffset(DUALNODE, start_GID, next_start_GID) << " : " << mNodes->getNtOffset(UNINODE, next_start_GID, start_GID) << " : " << mNodes->getNtOffset(UNINODE, start_GID, next_start_GID) << "\n===============" << std::endl;
-        }
         
         if(offset < 0)
         {

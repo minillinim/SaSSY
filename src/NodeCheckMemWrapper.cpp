@@ -218,6 +218,7 @@ NodeCheckMemWrapper::
     // tokenizes a node into an uMDINt so that it doesn't get silently nuked.
     // manages the various maps
     //
+    PARANOID_ASSERT_PRINT_L4((NCID != NC_NULL_ID), "Passed a null NCID");
     GenericNodeId ret_GID = safeGetNode(getCntxHead(NCID), getCntxPos(NCID), getCntxHistory(NCID), CTXID);
     if(clear)
         deleteNodeCheckId(NCID);
@@ -238,7 +239,10 @@ NodeCheckMemWrapper::
     // until another delete has occurred
     //
     NodePositionMapClass * master_npm = (*mMasterNPMs)[CTXID];
+    PARANOID_ASSERT_PRINT_L4((master_npm != NULL), "No masterNPM for: " << CTXID);
     NPMMasterElem tmp_master_elem;
+    bool first_found = false;
+    GenericNodeId ret_ID;
     if(master_npm->getMaster(&tmp_master_elem, savedPos))
     {
         // there is a master here... ... but is is the right one?
@@ -249,11 +253,22 @@ NodeCheckMemWrapper::
             {
                 if(mNodes->getCntxHistory(tmp_master_elem.NPMME_GID) == savedHID)
                 {
-                    return tmp_master_elem.NPMME_GID;
+                    if(!first_found)
+                    {
+                        ret_ID = tmp_master_elem.NPMME_GID;
+                        first_found = true;
+                    }
+                    else
+                    {
+                        logError(ret_ID << " : " <<  mNodes->getSequence(ret_ID) << " : " << mNodes->getCntxId(ret_ID) << " : " << mNodes->getCntxHistory(ret_ID) << " : " << mNodes->getCntxPos(ret_ID));
+                        logError(tmp_master_elem.NPMME_GID << " : " <<  mNodes->getSequence(tmp_master_elem.NPMME_GID)  << " : " << mNodes->getCntxId(tmp_master_elem.NPMME_GID) << " : " << mNodes->getCntxHistory(tmp_master_elem.NPMME_GID) << " : " << mNodes->getCntxPos(tmp_master_elem.NPMME_GID));
+                    }
                 }
             }
             
         } while(master_npm->getNextMaster(&tmp_master_elem));
+        if(first_found)
+            return ret_ID;
     }
     else
     {

@@ -692,7 +692,7 @@ ContextMemWrapper::
     // after we fail we need to force a break
     bool force_break = false;
     int num_loops = 0;
-
+    
     while(current_length >= last_length)
     {
         // clear what's left of the last round - if it's not the first round...
@@ -1709,7 +1709,7 @@ ContextMemWrapper::
                 if(mNodes->getCntxId(mNodes->getOlapNode(gnee)) == CTXID)
                 {
                     // this is the guy next to the cap
-                    shoots->push_back(contextShoot(mShootCheck->checkInNode(nbe.NBE_CurrentNode), -1 * mNodes->getOffset(gnee)));
+                    shoots->push_back(contextShoot(checkInShootNode(__LINE__, nbe.NBE_CurrentNode), -1 * mNodes->getOffset(gnee)));
                     break;
                 }
             } while(mNodes->getNextEdge(&gnee));
@@ -1822,7 +1822,7 @@ ContextMemWrapper::
                         {
                             // this is the guy next to the cap
                             detachBranch(&dead_GID, mNodes->getOlapNode(gnee));
-                            safeDetachNode(&disp_GID, dead_GID);
+                            safeDetachNode(__LINE__, &disp_GID, dead_GID);
                             break;
                         }
                     } while(mNodes->getNextEdge(&gnee));
@@ -2387,7 +2387,7 @@ ContextMemWrapper::
 
     // for very short insert sizes we can invalidate this node
     // then we'll have to try get it back
-    NodeCheckId join_token = mNodeCheck->checkInNode(joining_GID);
+    NodeCheckId join_token = checkInGraphNode(__LINE__, joining_GID);
     HistoryId current_HID = mNodes->getCntxHistory(joining_GID);
     
 #ifdef MAKE_PARANOID
@@ -2452,7 +2452,7 @@ ContextMemWrapper::
                 
                 // make a shoot of the dummy and push it onto the front of the queue
                 // this will tee it up for the recurrsive call
-                NodeCheckId new_dummy_token = mShootCheck->checkInNode(new_dummy);
+                NodeCheckId new_dummy_token = checkInShootNode(__LINE__, new_dummy);
                 shoots->push_front(contextShoot(new_dummy_token, shootDirection));
                 
                 // call this function recurrsively
@@ -2607,7 +2607,7 @@ ContextMemWrapper::
     // the joining_GID may get assimilated in this call
     // use these guys to get it back
     bool join_is_dummy = mNodes->isDummy(*joining_GID);
-    NodeCheckId join_token = mNodeCheck->checkInNode(*joining_GID);    
+    NodeCheckId join_token = checkInGraphNode(__LINE__, *joining_GID);    
 
     if(ascending)
     {
@@ -2712,7 +2712,7 @@ ContextMemWrapper::
                                                         near_master_GID = near_GID;
 
                                                         // make a new shoot and put it on the end of the queue
-                                                        shoots->push_back(contextShoot(mShootCheck->checkInNode(near_GID), -1 * offset_NH_J));
+                                                        shoots->push_back(contextShoot(checkInShootNode(__LINE__, near_GID), -1 * offset_NH_J));
                                                     }
 
                                                     // now map the far slave
@@ -2760,6 +2760,7 @@ ContextMemWrapper::
     static std::vector<GenericNodeId> CMWG_SS_dummy_tip_holder;                         // tips which are all dummies
     static std::vector<GenericNodeId>::iterator CMWG_SS_detach_iter, CMWG_SS_detach_last;
 
+
 /*HV*/ bool
 ContextMemWrapper::
 /*HV*/ smartShave(GenericNodeId * forkNode, uMDInt forkPoint, bool ascending)
@@ -2770,7 +2771,7 @@ ContextMemWrapper::
     // any ends which are completely made out of dummies
     // we also make the lists of cap nodes from the working node set
     //
-    NodeCheckId fork_token = mNodeCheck->checkInNode(*forkNode);
+    NodeCheckId fork_token = checkInGraphNode(__LINE__, *forkNode);
     ContextId CTXID = mNodes->getCntxId(*forkNode);
     
     GenericNodeEdgeElem gnee(DUALNODE);                             // we'll need these to do some walking
@@ -2779,7 +2780,7 @@ ContextMemWrapper::
     // when we do some very very light shaving
     // we also will trim back all the dummies at the end
     // use these guys to store the nodes to detach
-    GenericNodeId detach_delay, dum_detach_delay, query_node;
+    GenericNodeId detach_delay, dum_detach_delay, query_node, working_cap;
     CMWG_SS_to_detach_holder.clear();                         // nodes which are on DEPs
     CMWG_SS_dummy_tip_holder.clear();                         // tips which are all dummies
 
@@ -2788,35 +2789,68 @@ ContextMemWrapper::
     bool cleaned_up_some = true;
     while(cleaned_up_some)
     {
+        // safest way to bulk detach nodes is by using tokens
+        std::vector<NodeCheckId> safe_detach_tokens;
+        
         // reset this variable so we'll know when we've done nothing
         cleaned_up_some = false;
         
         int num_detached = 0;
 
         // go through all the caps
-        // because we are not using detachnode with an NBE we need to keep hold of the previous guy
-        // NOTE:
-        // This code, kinda relies on the fact that the algorithm adds to the cap queue in a specific way
-        // When this was written it was always the case that the last cap in the cap block 
-        // is the cap at the far end. If you change this behaviour, it will fuck things up - big time.
-        // 25-02-11
         NodeBlockElem nbe;
         mNodes->getCapBlock_DN(&nbe, CTXID);
-        mNodes->nextNBElem(&nbe);
-        GenericNodeId prev_cap = nbe.NBE_CurrentNode;
         while(mNodes->nextNBElem(&nbe))
         {
-            if(ascending ^ (mNodes->getCntxPos(prev_cap) < forkPoint))
+            // detach any nodes from the previous round
+            // this avoids the situation where we can pull the floor out from under our feet...
+            std::vector<NodeCheckId>::iterator sdt_iter = safe_detach_tokens.begin();
+            std::vector<NodeCheckId>::iterator sdt_last = safe_detach_tokens.end();
+            while(sdt_iter != sdt_last)
             {
-                // this is a cap so we're guarunteed only 1 edge
-                if(mNodes->getEdges(&gnee, GN_EDGE_STATE_NTRANS, 0, prev_cap))
+                GenericNodeId det_node = mNodeCheck->checkOutNode(true, CTXID, *sdt_iter);
+                
+                if(GN_NULL_ID != det_node)
+                {
+                    if(det_node != *forkNode)
+                    {
+                        // if forkNode is wrecked, then it will be fixed before
+                        // safeDetachNode exits!
+                        // We are going through all the cap nodes here, and this function
+                        // WILL play havoc with the crossnodes. so be careful..
+                        safeDetachNode(__LINE__, forkNode, det_node);
+                    }
+                    else
+                    {
+                        // made if all the way back to the fork node. the growing 
+                        // was preeeety useless...
+                        *forkNode = mNodeCheck->checkOutNode(true, CTXID, fork_token); 
+                        return false;
+                    }
+                    
+                }
+                else
+                {
+                    logError("1. NO MASTER ");
+                }
+                
+                sdt_iter++;
+            }
+            
+            safe_detach_tokens.clear();
+            
+            working_cap = nbe.NBE_CurrentNode;
+            if(ascending ^ (mNodes->getCntxPos(working_cap) < forkPoint))
+            {
+                // this is a cap so we're guaranteed only 1 edge
+                if(mNodes->getEdges(&gnee, GN_EDGE_STATE_NTRANS, 0, working_cap))
                 {
                     // clear these guys
                     CMWG_SS_to_detach_holder.clear();
                     CMWG_SS_dummy_tip_holder.clear();
                     bool straight_dummy_run = true;
                     int count = 0;
-                    if(mNodes->startWalk(&gnwe, prev_cap, mNodes->getOlapNode(gnee)))
+                    if(mNodes->startWalk(&gnwe, working_cap, mNodes->getOlapNode(gnee)))
                     {
                         query_node = mNodes->getPrevNode(gnwe);
                         
@@ -2891,6 +2925,7 @@ ContextMemWrapper::
                         CMWG_SS_detach_iter = CMWG_SS_dummy_tip_holder.begin();
                         CMWG_SS_detach_last = CMWG_SS_dummy_tip_holder.end();
                     }
+                    
                     if(need_to_shave)
                     {
                         // note that we did some cleaning
@@ -2898,49 +2933,14 @@ ContextMemWrapper::
                         
                         // we need an incorruptible list of nodes to detach,
                         // this is the best we can do...
-                        
-                        std::vector<NodeCheckId> safe_detach_tokens;
                         while(CMWG_SS_detach_iter != CMWG_SS_detach_last)
                         {
-                            safe_detach_tokens.push_back(mNodeCheck->checkInNode(*CMWG_SS_detach_iter));
+                            safe_detach_tokens.push_back(checkInGraphNode(__LINE__, *CMWG_SS_detach_iter));
                             
                             // fix the counters
                             num_detached++;
                             CMWG_SS_detach_iter++;
                         }     
-                        
-                        std::vector<NodeCheckId>::iterator sdt_iter = safe_detach_tokens.begin();
-                        std::vector<NodeCheckId>::iterator sdt_last = safe_detach_tokens.end();
-                        while(sdt_iter != sdt_last)
-                        {
-                            GenericNodeId det_node = mNodeCheck->checkOutNode(true, CTXID, *sdt_iter);
-                            
-                            if(GN_NULL_ID != det_node)
-                            {
-                                if(det_node != *forkNode)
-                                {
-                                    // if forkNode is wrecked, then it will be fixed before
-                                    // safeDetachNode exits!
-                                    safeDetachNode(forkNode, det_node);
-                                    
-                                }
-                                else
-                                {
-                                    // made if all the way back to the fork node. the growing 
-                                    // was preeeety useless...
-                                    *forkNode = mNodeCheck->checkOutNode(true, CTXID, fork_token); 
-                                    
-                                    return false;
-                                }
-                                
-                            }
-                            else
-                            {
-                                logError("1. NO MASTER ");
-                            }
-                            
-                            sdt_iter++;
-                        }
                         
                         // for very short insert sizes the query node (the old fork)
                         // may have been detached as a pair and may now be a dummy
@@ -2951,17 +2951,47 @@ ContextMemWrapper::
                             if(GN_NODE_TYPE_DETACHED != mNodes->getNodeType(DUALNODE, query_node))
                                 mNodes->curateMasterState(query_node);
                         }
-                        
                     }
                 }
                 else
                 {
-                    logError("No edges at cap: " << prev_cap );
+                    logError("No edges at cap: " << working_cap );
                     *forkNode = mNodeCheck->checkOutNode(true, CTXID, fork_token); 
                     return false;
                 }
             }
-            prev_cap = nbe.NBE_CurrentNode;
+        }
+        
+        // perhaps there were csome from the final round?
+        std::vector<NodeCheckId>::iterator sdt_iter = safe_detach_tokens.begin();
+        std::vector<NodeCheckId>::iterator sdt_last = safe_detach_tokens.end();
+        while(sdt_iter != sdt_last)
+        {
+            GenericNodeId det_node = mNodeCheck->checkOutNode(true, CTXID, *sdt_iter);
+            
+            if(GN_NULL_ID != det_node)
+            {
+                if(det_node != *forkNode)
+                {
+                    // if forkNode is wrecked, then it will be fixed before
+                    // safeDetachNode exits!
+                    safeDetachNode(__LINE__, forkNode, det_node);
+                }
+                else
+                {
+                    // made if all the way back to the fork node. the growing 
+                    // was preeeety useless...
+                    *forkNode = mNodeCheck->checkOutNode(true, CTXID, fork_token); 
+                    return false;
+                }
+                
+            }
+            else
+            {
+                logError("1. NO MASTER ");
+            }
+            
+            sdt_iter++;
         }
     }
     *forkNode = mNodeCheck->checkOutNode(true, CTXID, fork_token); 
@@ -3046,7 +3076,7 @@ ContextMemWrapper::
     {
         if(ascending ^ (mNodes->getCntxPos(nbe.NBE_CurrentNode) < outerForkPoint))
         {
-            int ret_val = primeArm(&stbm, newShoot, ascending, outerForkPoint, true, nbe.NBE_CurrentNode, CTXID);
+            int ret_val = primeArm(__LINE__, &stbm, newShoot, ascending, outerForkPoint, true, nbe.NBE_CurrentNode, CTXID);
             if(0 == ret_val)
             { return true; }
             else if( 0 > ret_val )
@@ -3148,7 +3178,7 @@ ContextMemWrapper::
                     // add the winning arm back into the list at the new position
                     // we know there are still multiple branches to go through here
                     // so we should never allow the formation of new shoots...
-                    int ret_val = primeArm(&stbm, newShoot, ascending, outerForkPoint, false, winning_GID, CTXID);
+                    int ret_val = primeArm(__LINE__, &stbm, newShoot, ascending, outerForkPoint, false, winning_GID, CTXID);
                     if( 0 > ret_val )
                         return false;
                     
@@ -3191,7 +3221,7 @@ ContextMemWrapper::
             stbm.release();
             
             // add the winning arm back into the list at the new position
-            int ret_val = primeArm(&stbm, newShoot, ascending, outerForkPoint, true, winning_GID, CTXID);
+            int ret_val = primeArm(__LINE__, &stbm, newShoot, ascending, outerForkPoint, true, winning_GID, CTXID);
             
             if(0 == ret_val)
                 return true;
@@ -3208,7 +3238,7 @@ ContextMemWrapper::
 
 /*HV*/ int
 ContextMemWrapper::
-/*HV*/ primeArm(SortedTreeBranchManager * stbm, contextShoot * newShoot, bool ascending, uMDInt stopPoint, bool allowFirstBreak, GenericNodeId GID, ContextId CTXID)
+/*HV*/ primeArm(unsigned int lineNum, SortedTreeBranchManager * stbm, contextShoot * newShoot, bool ascending, uMDInt stopPoint, bool allowFirstBreak, GenericNodeId GID, ContextId CTXID)
 //HO ;
 { // logInfo(__LINE__,1);
     //-----
@@ -3228,7 +3258,7 @@ ContextMemWrapper::
     sMDInt tdist = 0;
     bool in_range = false;
     int current_rank = 1;
-
+    
     // these two will be passed to the stbm
     fork_point = 0;
     arm_key_GID = GN_NULL_ID;
@@ -3249,7 +3279,7 @@ ContextMemWrapper::
                 // We also need to find out the ID of the last node before the cross because this
                 // node will act as the "ID" for the entire arm
                 uMDInt arm_end_pos = mNodes->getCntxPos(near_GID);
-                do { //mNodes->printContentsOfWE(gnwe);
+                do {
                     if(stopPoint == mNodes->getCntxPos(mNodes->getCurrentNode(gnwe)))
                     {
                         // there are a number of reasons why we could be at the stop node 
@@ -3386,7 +3416,7 @@ ContextMemWrapper::
     }
     if(!in_range)
     {
-        logError("Couldn't define a profile for branch");
+        logError("Couldn't define a profile for branch: " << GID << " : " << mNodes->isDummy(GID) << " : " << CTXID << " : " << stopPoint << " : " << lineNum << " : " << mNodes->getCntxPos(near_GID));
         return -1;
     }
     return 1;
@@ -5032,7 +5062,7 @@ ContextMemWrapper::
     // remove the dummy from the npm
     NodePositionMapClass * npm = mMasterNPMs[mNodes->getCntxId(dummy)];
     
-    npm->deleteElem(dummy);
+    if(!npm->deleteElem(dummy)) { logError(""); }
     
     // delete it from the generic node lists...
     mNodes->deleteDummy(dummy);
@@ -5067,7 +5097,8 @@ ContextMemWrapper::
     PARANOID_ASSERT_PRINT_L2(isValidAddress(CTXID), "Invalid Context: " << dummy << " : " << CTXID);
     NodePositionMapClass * npm = mMasterNPMs[CTXID];
     
-    npm->deleteElem(dummy);
+    if(!npm->deleteElem(dummy)) { logError(""); }
+    
     // delete it from the generic node lists...
     mNodes->deleteDummy(dummy);
     
@@ -5123,22 +5154,35 @@ ContextMemWrapper::
 }
 //HO 
 
-static std::vector<GenericNodeId> CMWG_collateral_nodes;
-static std::vector<GenericNodeId> CMWG_pair_nodes;
-static std::vector<GenericNodeId>::iterator CMWG_coll_iter;
-//HO inline void safeDetachNode(GenericNodeId * startBranch, GenericNodeId dead_GID) { safeDetachNode(startBranch, NULL, dead_GID); }
+//HO inline void safeDetachNode(unsigned int lineNum, GenericNodeId * startBranch, GenericNodeId dead_GID) { safeDetachNode(lineNum, startBranch, NULL, dead_GID); }
 //HO 
 
 /*HV*/ void
 ContextMemWrapper::
-/*HV*/ safeDetachNode(GenericNodeId * startBranch, GenericNodeWalkingElem * active_GNWE, GenericNodeId dead_GID)
+/*HV*/ safeDetachNode(unsigned int lineNum, GenericNodeId * startBranch, GenericNodeWalkingElem * active_GNWE, GenericNodeId dead_GID)
 //HO ;
 { // logInfo(__LINE__,1);
     //-----
     // Remove a node from the context and make sure all NPMs are left ok
     // insert new dummies as needed
     //
+    std::vector<GenericNodeId> collateral_nodes;
+    std::vector<GenericNodeId>::iterator coll_iter;
+
+    std::vector<GenericNodeId> slave_pair_nodes;
+    std::vector<GenericNodeId>::iterator slave_pair_iter;
+    
+    std::vector<NodeCheckId> pair_nodes;
+    std::vector<NodeCheckId>::iterator pair_iter;
+    //std::vector<GenericNodeId> pair_nodes;
+    //std::vector<GenericNodeId>::iterator pair_iter;
+    
+    // we're going to need to curate a whole bunch of nodes at the end...
+    std::vector<NodeCheckId> curateableNodes;
+    
     ContextId CTXID = mNodes->getCntxId(dead_GID);
+    
+    PARANOID_ASSERT_PRINT_L4((CTXID != CTX_NULL_ID), "Dead GID has null Context: " << mNodes->isValidAddress(dead_GID));
     NodePositionMapClass * npm = mMasterNPMs[CTXID];
     
     // if we are calling this from within detachBranch then we need to make sure that
@@ -5148,19 +5192,26 @@ ContextMemWrapper::
     NodeCheckId current_token = NC_NULL_ID;
     
     bool start_is_null = false;
+    NodeCheckId start_token = NC_NULL_ID;
     if(*startBranch == GN_NULL_ID)
         start_is_null = true;
-    NodeCheckId start_token = mNodeCheck->checkInNode(*startBranch);
+    else
+        start_token = checkInGraphNode(__LINE__, *startBranch);
 
     if(NULL != active_GNWE)
     {
-        prev_token = mNodeCheck->checkInNode(mNodes->getPrevNode(*active_GNWE));
-        current_token = mNodeCheck->checkInNode(mNodes->getCurrentNode(*active_GNWE));
+        prev_token = checkInGraphNode(__LINE__, mNodes->getPrevNode(*active_GNWE));
+        current_token = checkInGraphNode(__LINE__, mNodes->getCurrentNode(*active_GNWE));
     }
 
-    // we may have to detach a whole heap more nodes
-    CMWG_collateral_nodes.clear();
-    CMWG_pair_nodes.clear();
+    // we'll need to curate this guys neighbours
+    GenericNodeEdgeElem gnee(DUALNODE);
+    if(mNodes->getEdges(&gnee, GN_EDGE_STATE_NTRANS, 0,dead_GID ))
+    {
+        do {
+            curateableNodes.push_back(mNodeCheck->checkInNode(mNodes->getOlapNode(gnee)));
+        } while(mNodes->getNextEdge(&gnee));
+    }
 
     // need to remove this master and all slaves attached too
     if(mNodes->isCntxMaster(dead_GID))
@@ -5172,8 +5223,15 @@ ContextMemWrapper::
             do {
                 // push back the slave and its pair
                 GenericNodeId olap_node = mNodes->getOlapNode(gnee);
-                CMWG_collateral_nodes.push_back(olap_node);
-                CMWG_pair_nodes.push_back(mNodes->getPair(olap_node));
+                collateral_nodes.push_back(olap_node);
+                if(mNodes->isCntxMaster(mNodes->getPair(olap_node)))
+                {
+                    pair_nodes.push_back(checkInGraphNode(__LINE__, mNodes->getPair(olap_node)));
+                }
+                else
+                {
+                    slave_pair_nodes.push_back(mNodes->getPair(olap_node));
+                }
             } while(mNodes->getNextEdge(&gnee));
         }
     }
@@ -5186,7 +5244,6 @@ ContextMemWrapper::
         // just delete the dummy now
         // it will be taken out of the lists automatically
         deleteDummy(dead_GID, tmp_CTXID);
-
     }
     else
     {
@@ -5199,27 +5256,62 @@ ContextMemWrapper::
         mNodes->detachNode(DUALNODE, dead_GID);
         
         // non-dummies have pairs
-        CMWG_pair_nodes.push_back(mNodes->getPair(dead_GID));
+        if(mNodes->isCntxMaster(mNodes->getPair(dead_GID)))
+        {
+            pair_nodes.push_back(checkInGraphNode(__LINE__, mNodes->getPair(dead_GID)));
+        }
+        else
+        {
+            slave_pair_nodes.push_back(mNodes->getPair(dead_GID));
+        }
     }
-
+    
     // now we can do all the collateral nodes
-    CMWG_coll_iter = CMWG_collateral_nodes.begin();
-    while(CMWG_coll_iter != CMWG_collateral_nodes.end())
+    coll_iter = collateral_nodes.begin();
+    while(coll_iter != collateral_nodes.end())
     {
         // it's just a slave, we only need to detach it and that's all
-        mNodes->resetDualNode(*CMWG_coll_iter);
-        CMWG_coll_iter++;
+        mNodes->resetDualNode(*coll_iter);
+        coll_iter++;
     }
-    // now we do all the pairs
-    CMWG_coll_iter = CMWG_pair_nodes.begin();
-    while(CMWG_coll_iter != CMWG_pair_nodes.end())
+
+    // next do the pairs that are slaves
+    slave_pair_iter = slave_pair_nodes.begin();
+    while(slave_pair_iter != slave_pair_nodes.end())
     {
-        if(mNodes->isCntxMaster(*CMWG_coll_iter))
+        // this node is just a slave so we can detach it easily
+        // however we need to make sure that we find the master
+        // and decrement the read depth here
+        // also we should curate it's state afterwards so store the info now...
+        GenericNodeEdgeElem gnee_mas(DUALNODE);
+        if(mNodes->getEdges(&gnee_mas, GN_EDGE_STATE_TRANS, 0, *slave_pair_iter))
+        {
+            if(mNodes->isValidAddress(mNodes->getOlapNode(gnee_mas)))
+            {
+                mNodes->decCntxReadDepth(mNodes->getOlapNode(gnee_mas));
+                curateableNodes.push_back(mNodeCheck->checkInNode(mNodes->getOlapNode(gnee_mas)));
+            }
+        }
+        else
+        {
+            logError("No master at slaveGID: " << *slave_pair_iter);
+        }
+        mNodes->detachNode(DUALNODE, *slave_pair_iter);
+        
+        slave_pair_iter++;
+    }
+
+    // now we do all the pairs
+    pair_iter = pair_nodes.begin();
+    while(pair_iter != pair_nodes.end())
+    {
+        GenericNodeId current_GID = mNodeCheck->checkOutNode(true, CTXID, *pair_iter);
+        if(mNodes->isCntxMaster(current_GID))
         {
             // this is a bit trickier...
             // Do we have any slaves?
             bool need_swap_start = false;
-            if(*CMWG_coll_iter == *startBranch)
+            if(current_GID == *startBranch)
             {
                 need_swap_start = true;
             }
@@ -5227,7 +5319,7 @@ ContextMemWrapper::
             GenericNodeId replacement_master;
             bool has_slaves = false;
             GenericNodeEdgeElem gnee(DUALNODE);
-            if(mNodes->getEdges(&gnee, GN_EDGE_STATE_TRANS, 0, *CMWG_coll_iter))
+            if(mNodes->getEdges(&gnee, GN_EDGE_STATE_TRANS, 0, current_GID))
             {
                 // you'll do!
                 has_slaves = true;
@@ -5235,30 +5327,30 @@ ContextMemWrapper::
                 // wipe all the edges (assymetrical)
                 mNodes->resetDualNode(replacement_master);
                 PARANOID_ASSERT_L2(mNodes->isValidAddress(replacement_master));
-                mNodes->transferEdges(*CMWG_coll_iter, replacement_master);
+                mNodes->transferEdges(current_GID, replacement_master);
                 
                 // fix all the Context flags
                 mNodes->setCntxMaster(true, replacement_master);
-                mNodes->setCntxId(mNodes->getCntxId(*CMWG_coll_iter), replacement_master);
-                mNodes->setCntxPos(mNodes->getCntxPos(*CMWG_coll_iter), replacement_master);
-                mNodes->setCntxReversed(mNodes->isCntxReversed(*CMWG_coll_iter), replacement_master);
-                mNodes->setCntxHistory(mNodes->getCntxHistory(*CMWG_coll_iter), replacement_master);
-                mNodes->setCntxReadDepth(mNodes->getCntxReadDepth(*CMWG_coll_iter) - 1, replacement_master);
+                mNodes->setCntxId(mNodes->getCntxId(current_GID), replacement_master);
+                mNodes->setCntxPos(mNodes->getCntxPos(current_GID), replacement_master);
+                mNodes->setCntxReversed(mNodes->isCntxReversed(current_GID), replacement_master);
+                mNodes->setCntxHistory(mNodes->getCntxHistory(current_GID), replacement_master);
+                mNodes->setCntxReadDepth(mNodes->getCntxReadDepth(current_GID) - 1, replacement_master);
                 
                 // update the NPM
-                npm->updateElem(*CMWG_coll_iter, replacement_master);
+                npm->updateElem(current_GID, replacement_master);
             }
             if(!has_slaves)
             {
                 // we'll need to put a dummy here in it's place
-                replacement_master = createNewDummy(mNodes->getCntxPos(*CMWG_coll_iter), mNodes->isCntxReversed(*CMWG_coll_iter), *CMWG_coll_iter, mNodes->getCntxHistory(*CMWG_coll_iter), mNodes->getCntxId(*CMWG_coll_iter));
+                replacement_master = createNewDummy(mNodes->getCntxPos(current_GID), mNodes->isCntxReversed(current_GID), current_GID, mNodes->getCntxHistory(current_GID), mNodes->getCntxId(current_GID));
                 PARANOID_ASSERT_L2(mNodes->isValidAddress(replacement_master));
                 
-                mNodes->transferEdges(*CMWG_coll_iter, replacement_master);
+                mNodes->transferEdges(current_GID, replacement_master);
                 
                 // the npm has the replacement master in position because of the call to 
                 // makeMaster within createNewDummy. We just need to delete the old reference
-                npm->deleteElem(*CMWG_coll_iter);
+                npm->deleteElem(current_GID);
             }
             
             // fix all the lists for the replacement master
@@ -5273,7 +5365,7 @@ ContextMemWrapper::
             
             // finally we can reset this node
             // the lists will be updated within the call
-            mNodes->resetDualNode(*CMWG_coll_iter);
+            mNodes->resetDualNode(current_GID);
 
         }
         else
@@ -5282,7 +5374,7 @@ ContextMemWrapper::
             // however we need to make sure that we find the master
             // and decrement the read depth here
             GenericNodeEdgeElem gnee_mas(DUALNODE);
-            if(mNodes->getEdges(&gnee_mas, GN_EDGE_STATE_TRANS, 0, *CMWG_coll_iter))
+            if(mNodes->getEdges(&gnee_mas, GN_EDGE_STATE_TRANS, 0, current_GID))
             {
                 if(mNodes->isValidAddress(mNodes->getOlapNode(gnee_mas)))
                 {
@@ -5291,13 +5383,11 @@ ContextMemWrapper::
             }
             else
             {
-                logError("No master at slaveGID: " << *CMWG_coll_iter);
+                logError("No master at slaveGID: " << current_GID);
             }
-
-            mNodes->detachNode(DUALNODE, *CMWG_coll_iter);
-
+            mNodes->detachNode(DUALNODE, current_GID);
         }
-        CMWG_coll_iter++;
+        pair_iter++;
     }
 
     // if we have corrupted the given walking elem then now is the time to fix it
@@ -5307,11 +5397,32 @@ ContextMemWrapper::
         GenericNodeId tmp_current = mNodeCheck->checkOutNode(true, CTXID, current_token); 
         mNodes->startWalk(active_GNWE, tmp_prev, tmp_current);
     }
-    
+
+    // curate any affected masters...
+    // fo now we can do this here BUT detachNode returns void
+    // so if need be you can make this funciton 
+    // return a pointer to this vector (modify to use new()) and then
+    // curate outside where you have access to the crossNode NBE.
+    std::vector<NodeCheckId>::iterator cur_iter = curateableNodes.begin();
+    std::vector<NodeCheckId>::iterator cur_last = curateableNodes.end();
+    while(cur_iter != cur_last)
+    {
+        GenericNodeId tmp_GID = mNodeCheck->checkOutNode(true, CTXID, *cur_iter);
+        mNodes->curateMasterState(tmp_GID);
+        cur_iter++;
+    }
+
     if(!start_is_null)
-    { *startBranch = mNodeCheck->checkOutNode(true, CTXID, start_token); }
+    { 
+        *startBranch = mNodeCheck->checkOutNode(true, CTXID, start_token); 
+        mNodes->curateMasterState(*startBranch);
+    }
 }
 //HO
+
+static std::vector<GenericNodeId> CMWG_collateral_nodes;
+static std::vector<GenericNodeId> CMWG_pair_nodes;
+static std::vector<GenericNodeId>::iterator CMWG_coll_iter;
 
 /*HV*/ void
 ContextMemWrapper::
@@ -5465,7 +5576,7 @@ ContextMemWrapper::
     GenericNodeId detach_delay_1 = GN_NULL_ID;
     GenericNodeId detach_delay_2 = GN_NULL_ID;
     ContextId CTXID = mNodes->getCntxId(*startBranch);
-    NodeCheckId start_token = mNodeCheck->checkInNode(*startBranch);
+    NodeCheckId start_token = checkInGraphNode(__LINE__, *startBranch);
     
     // use these to measure delays
     int round_number = 0;
@@ -5478,7 +5589,7 @@ ContextMemWrapper::
             {
                 // the walking element and the startBranch are
                 // both maintained in the call to safe detach node
-                safeDetachNode(startBranch, &gnwe, detach_delay_2);
+                safeDetachNode(__LINE__, startBranch, &gnwe, detach_delay_2);
             }
             else if(round_number == 1)
             {
@@ -5496,8 +5607,8 @@ ContextMemWrapper::
         } while(mNodes->rankStep(&gnwe));
         
         // detach_delay_1 points to a cap or cross, detach_delay_2 points to the guy just before that
-        NodeCheckId dd1_token = mNodeCheck->checkInNode(detach_delay_1);
-        NodeCheckId dd2_token = mNodeCheck->checkInNode(detach_delay_2);
+        NodeCheckId dd1_token = checkInGraphNode(__LINE__, detach_delay_1);
+        NodeCheckId dd2_token = checkInGraphNode(__LINE__, detach_delay_2);
         
         if(mNodes->getNtRank(DUALNODE, detach_delay_1) > 2)
         {
@@ -5530,18 +5641,19 @@ ContextMemWrapper::
         }
         
         // now it's safe to detach these guys ... maybe
-        detach_delay_1 = mNodeCheck->checkOutNode(true, CTXID, dd1_token); 
         detach_delay_2 = mNodeCheck->checkOutNode(true, CTXID, dd2_token); 
         
         if(branch_longer_than_one)
         {
             // for very small insert sizes is may be possible that these two
             // guys are actually pairs. watch out!
+            detach_delay_1 = mNodeCheck->checkOutNode(false, CTXID, dd1_token); 
             if(mNodes->getPair(detach_delay_2) != detach_delay_1)
-                safeDetachNode(startBranch, detach_delay_2);
+                safeDetachNode(__LINE__, startBranch, detach_delay_2);
         }
         // if the above was a pair then we will get it here anyways...
-        safeDetachNode(startBranch, detach_delay_1);
+        detach_delay_1 = mNodeCheck->checkOutNode(true, CTXID, dd1_token); 
+        safeDetachNode(__LINE__, startBranch, detach_delay_1);
     }
     else
     {
@@ -5752,8 +5864,8 @@ ContextMemWrapper::
     // update the values of a given shoot
     // interfaces with the check in and check out code
     //
-     mShootCheck->checkOutNode(true, CTXID, theShoot->first);
-    theShoot->first = mShootCheck->checkInNode(GID);
+    mShootCheck->checkOutNode(true, CTXID, theShoot->first);
+    theShoot->first = checkInShootNode(__LINE__, GID);
     theShoot->second = dirn;
 }
 //HO 
@@ -5768,7 +5880,7 @@ ContextMemWrapper::
     // interfaces with the check in and check out code
     //
     contextShoot ret_shoot;
-    ret_shoot.first = mShootCheck->checkInNode(mShootCheck->checkOutNode(false, CTXID,theShoot->first));
+    ret_shoot.first = checkInShootNode(__LINE__, mShootCheck->checkOutNode(false, CTXID,theShoot->first));
     ret_shoot.second = theShoot->second;
     return ret_shoot;
 }
@@ -5807,6 +5919,33 @@ ContextMemWrapper::
         mNodeCheck->initialise((int)SAS_DEF_CTX_NC_NODE_SIZE);
         mNodeCheck->setObjectPointers(mNodes, &mMasterNPMs, "Nodes");
     }
+}
+//HO 
+
+
+/*HV*/ NodeCheckId
+ContextMemWrapper::
+/*HV*/ checkInGraphNode(unsigned int lineNum, GenericNodeId GID)
+//HO ;
+{ 
+    //-----
+    // make sure we're only checking in masters!
+    //
+    if(!mNodes->isCntxMaster(GID)) { logError("Checking in slave on line: " << lineNum); }
+    return mNodeCheck->checkInNode(GID);
+}
+//HO 
+
+/*HV*/ NodeCheckId
+ContextMemWrapper::
+/*HV*/ checkInShootNode(unsigned int lineNum, GenericNodeId GID)
+//HO ;
+{ 
+    //-----
+    // make sure we're only checking in masters!
+    //
+    if(!mNodes->isCntxMaster(GID)) { logError("Checking in slave on line: " << lineNum); }
+    return mShootCheck->checkInNode(GID);
 }
 //HO 
 

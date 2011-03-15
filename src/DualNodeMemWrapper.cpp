@@ -1444,6 +1444,8 @@ DualNodeMemWrapper::
     int num_used = 0;
     int num_used_in_db = 0;
     
+    if(newNode == baseNode) { logError("ADDING TO SELF: " << sayEdgeStateLikeAHuman(state) << " : " << newNode << " : " << offsetFromBase << " : " << retOffsetMatches); }
+    
     // now run through every used data_block and check it all out
     while(DND_NULL_ID != next_data_block)
     {

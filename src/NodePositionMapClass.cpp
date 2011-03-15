@@ -139,7 +139,7 @@ NodePositionMapClass::
 
 //HO inline bool updateElem(GenericNodeId oldGID, GenericNodeId newGID) { return mData->updateElem(oldGID, newGID); }
 //HO 
-//HO inline void deleteElem(GenericNodeId GID) { mData->deleteElem(GID); }
+//HO inline bool deleteElem(GenericNodeId GID) { return mData->deleteElem(GID); }
 //HO 
 //HO inline void deleteElem(GenericNodeId GID, bool orientation, uMDInt position) { mData->deleteElem(GID, orientation, position); }
 //HO 
