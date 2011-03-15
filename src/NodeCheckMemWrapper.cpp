@@ -260,8 +260,11 @@ NodeCheckMemWrapper::
                     }
                     else
                     {
-                        logError(ret_ID << " : " <<  mNodes->getSequence(ret_ID) << " : " << mNodes->getCntxId(ret_ID) << " : " << mNodes->getCntxHistory(ret_ID) << " : " << mNodes->getCntxPos(ret_ID));
-                        logError(tmp_master_elem.NPMME_GID << " : " <<  mNodes->getSequence(tmp_master_elem.NPMME_GID)  << " : " << mNodes->getCntxId(tmp_master_elem.NPMME_GID) << " : " << mNodes->getCntxHistory(tmp_master_elem.NPMME_GID) << " : " << mNodes->getCntxPos(tmp_master_elem.NPMME_GID));
+                        // NOTE LOOK AT ME!!!!
+                        // KILL THIS ERROR FOR NOW
+                        // If there are problems later, check out this guy first
+                        //logError(ret_ID << " : " <<  mNodes->getSequence(ret_ID) << " : " << mNodes->getCntxId(ret_ID) << " : " << mNodes->getCntxHistory(ret_ID) << " : " << mNodes->getCntxPos(ret_ID));
+                        //logError(tmp_master_elem.NPMME_GID << " : " <<  mNodes->getSequence(tmp_master_elem.NPMME_GID)  << " : " << mNodes->getCntxId(tmp_master_elem.NPMME_GID) << " : " << mNodes->getCntxHistory(tmp_master_elem.NPMME_GID) << " : " << mNodes->getCntxPos(tmp_master_elem.NPMME_GID));
                     }
                 }
             }
