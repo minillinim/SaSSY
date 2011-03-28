@@ -205,8 +205,9 @@ void S_Scaff::printContents()
     std::string dirn = "opposite";
     if(SS_IsBefore) { lies = "before"; }
     if(SS_IsSameDirn) { dirn = "same"; }
-    std::cout << SS_Linker << " lies " << lies << " " << SS_Base << " in the " << dirn << " direction, with gap: " << SS_Gap << " PK: " << SS_PairKey << " TK: " << SS_TypeKey << std::endl;
+    std::cout <<"L: " << SS_Linker << " lies " << lies << " B: " << SS_Base << " in the " << dirn << " direction, with gap: " << SS_Gap << " PK: " << SS_PairKey << " TK: " << SS_TypeKey << std::endl;
     std::cout << "Hit from FileSet: " << SS_FileId << " BasePos: " << SS_BasePos << " BaseDist: " << SS_BaseDist << " LinkerPos: " << SS_LinkerPos << " LinkerDist: " << SS_LinkerDist << std::endl;
+    std::cout << "IIC: " << SS_IncludeInCount << " FileId: " << SS_FileId << std::endl;
 }
 
 void S_Scaff::printCSV()
@@ -1013,6 +1014,7 @@ void Scaffolder::purgeValidScaffolds(void)
             if(kill_list.find(*vs_iter) != kill_list.end())
             {
                 // it's in the kill list!
+                (*vs_iter)->printContents();
                 delete *vs_iter;
                 *vs_iter = NULL;
             }
@@ -1031,6 +1033,7 @@ void Scaffolder::purgeValidScaffolds(void)
         // re-populate this map. No Context should appear in more than 2 V_S's
         if(*vs_iter != NULL)
         {
+            (*vs_iter)->printContents();
             cont_V_mmap.insert(std::pair<ContextId, V_Scaff *>((*vs_iter)->VS_Base, (*vs_iter)));
             cont_V_mmap.insert(std::pair<ContextId, V_Scaff *>((*vs_iter)->VS_Linker, (*vs_iter)));
         }
@@ -1254,6 +1257,7 @@ bool Scaffolder::scaffoldAll(void)
     logInfo("Start Scaffolding " << mAllContexts->size() << " contigs", 1);
     logInfo("Walking up to: " << walk_limit << " bases into each Context", 5);
     
+    
     // go through each Context
     std::map<ContextId, GenericNodeId>::iterator all_contexts_iter = mAllContexts->begin();
     std::map<ContextId, GenericNodeId>::iterator all_contexts_last = mAllContexts->end();
@@ -1405,9 +1409,6 @@ bool Scaffolder::processAtMaster(bool isStart, GenericNodeId head_GID, bool cntx
                                 
                                 if(pos_used_map.find(template_pos_cntx_key) == pos_used_map.end())
                                 {
-                                    // first time we've seen this guy
-                                    pos_used_map[template_pos_cntx_key] = true;
-                                    
                                     // Use the file reversed for the working_pair, but the context reversed of the template_pair
                                     // because we want to see how the pair WOULD map at various positions in the template_context
                                     bool working_pair_rev = (working_pair_GID_file_reversed ^ mNodes->isCntxReversed(template_pair_GID));
@@ -1472,9 +1473,18 @@ bool Scaffolder::processAtMaster(bool isStart, GenericNodeId head_GID, bool cntx
                                     // we need to place some limits on the gap. It can be -ve, but not more than
                                     // the readLength. Otherwise we would have caught it in the overlapperation stage
                                     sMDInt total_eaten = working_eaten + working_pair_eaten + mReadLength;
-                                    if((total_eaten <= (sMDInt)(mUpperCuts[WFID])) && (total_eaten >= (sMDInt)(mLowerCuts[WFID])))
+                                    
+                                    // Regardless of whether the position is good or not, we don't need to check it again
+                                    pos_used_map[template_pos_cntx_key] = true;
+                                    
+                                    // NOW... We can't have any overlaps playing a part here which are larger than
+                                    // the insert size of the library the read comes from. right?
+                                    // Lower bound is a little trickier, 
+                                    //if((total_eaten <= (sMDInt)(mUpperCuts[WFID])) && (total_eaten >= (sMDInt)(mLowerCuts[WFID])))
+                                    if(total_eaten <= (sMDInt)(mUpperCuts[WFID]))
                                     {
                                         // This guy links!
+                                        
                                         S_Scaff * tmp_scaff = new S_Scaff;
 
                                         tmp_scaff->SS_Base = mCurrentContext;
@@ -1495,6 +1505,7 @@ bool Scaffolder::processAtMaster(bool isStart, GenericNodeId head_GID, bool cntx
                                         
                                         // add it to the used nodes list
                                         mUsedNodes[single_check_GID] = true;
+                                        
                                         break;
                                     }
                                 }
@@ -1503,7 +1514,6 @@ bool Scaffolder::processAtMaster(bool isStart, GenericNodeId head_GID, bool cntx
                     }
                 }
             }
-            
         }
     }
     return true;
