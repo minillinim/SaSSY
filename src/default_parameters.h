@@ -112,11 +112,4 @@
 #else
 # define SAS_EXENAME "Sassy"
 #endif
-/******************************************************************************
-** OFFICIAL STUFF
-******************************************************************************/
-#define SAS_VERSION    "0.1.1.2"
-#define SAS_COPYRIGHT_I "\n\tCopyright (c) 2008, 2009, 2010, 2011 Michael Imelfort and Dominic Eales.\n\tThis program comes with ABSOLUTELY NO WARRANTY; for details type `show_w'.\n\tThis is free software, and you are welcome to redistribute it\n\tunder certain conditions; type `show_c' for details."
-#define SAS_COPYRIGHT_R "\n\tCopyright (c) 2008, 2009, 2010, 2011 Michael Imelfort and Dominic Eales.\n\tThis is free software; see the source for copying conditions. There is NO\n\twarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE."
-                        
 #endif // DEF_PARAM_H
