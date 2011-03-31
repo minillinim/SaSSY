@@ -25,14 +25,14 @@
 ##
 ##@@ entries look like:
 ##@@
-##@@ @SRR001665.1 071112_SLXA-EAS1_s_4:1:1:672:654 length=36
+##@@ @bleg[/-]1
 ##@@ GCTACGGAATAAAACCAGGAACAACAGACCCAGCAC
-##@@ +SRR001665.1 071112_SLXA-EAS1_s_4:1:1:672:654 length=36
+##@@ +[bleg]
 ##@@ IIIIIIIIIIIIIIIIIIIIIIIIEII9IIIEIIII
 ##@@
 ##
 
-format.name = "FASTQ-dualfiles"
+format.name = "FASTQ-dualfiles (plain vanilla)"
 format.number-of-files = 2
 format.file-1-label = "FASTQ_1"
 format.file-2-label = "FASTQ_2"
@@ -43,18 +43,18 @@ format.lines-per-record = 4
 format.file-set-style = ONE_PAIRED_SEQ_PER_FILE
 
 ## Expressions For File Parsing ##
-#format.common-record-expr = /@([^:@]*):([^:@]*):([^:@]*):([^:@]*):([^#@]*) ([^@]*)\n([^@]+)\n\+([^\n]*)\n(.+)\n/
-format.common-record-expr = /@([^:@]*):([^:@]*):([^:@]*):([^:@]*):([^#@]*)[#\s]([^@]*)\n([^@]+)\n\+([^\n]*)\n(.+)\n/
+format.common-record-expr = /@([^\n]*)(\d)\n([^\n]*)\n[^\n]*\n[^\n]*\n/
+
 ###
-output.unique-id = "UNKNOWN"
-output.instrument-name = %1.1%
-output.lane-number = %1.2%
-output.tile-number = %1.3%
-output.x-coord = %1.4%
-output.y-coord = %1.5%
+output.unique-id = %1.1%
+output.instrument-name = "UNKNOWN"
+output.lane-number = "UNKNOWN"
+output.tile-number = "UNKNOWN"
+output.x-coord = "UNKNOWN"
+output.y-coord = "UNKNOWN"
 output.multiplex-index = "UNKNOWN"
-output.pair-reference = "UNKNOWN"
-output.sequence-data = %1.7%
-output.quality-data = %1.9%
+output.pair-reference = %1.2%
+output.sequence-data = %1.3%
+output.quality-data = "UNKNOWN"
 output.quality-format = "UNKNOWN"
 
