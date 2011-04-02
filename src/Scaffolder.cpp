@@ -118,7 +118,7 @@ void V_Scaff::printContents()
     if(VS_IsBefore) { lies = "before"; }
     if(VS_IsSameDirn) { dirn = "same"; }
     std::cout << VS_Linker << " lies " << lies << " " << VS_Base << " in the " << dirn << " direction, with gap: " << VS_Gap << std::endl;
-    std::cout << VS_BeforeScaff << " : " << VS_BeyondScaff << " : " << VS_PathAgrees << std::endl;
+    //std::cout << VS_BeforeScaff << " : " << VS_BeyondScaff << " : " << VS_PathAgrees << std::endl;
 }
 
 void V_Scaff::logContents(int logLevel)
@@ -1014,7 +1014,6 @@ void Scaffolder::purgeValidScaffolds(void)
             if(kill_list.find(*vs_iter) != kill_list.end())
             {
                 // it's in the kill list!
-                (*vs_iter)->printContents();
                 delete *vs_iter;
                 *vs_iter = NULL;
             }
@@ -1033,7 +1032,6 @@ void Scaffolder::purgeValidScaffolds(void)
         // re-populate this map. No Context should appear in more than 2 V_S's
         if(*vs_iter != NULL)
         {
-            (*vs_iter)->printContents();
             cont_V_mmap.insert(std::pair<ContextId, V_Scaff *>((*vs_iter)->VS_Base, (*vs_iter)));
             cont_V_mmap.insert(std::pair<ContextId, V_Scaff *>((*vs_iter)->VS_Linker, (*vs_iter)));
         }
