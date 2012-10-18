@@ -74,11 +74,13 @@ printAtStart();
 my $options = checkParams();
 
 # set defaults and override if called for
+my $trim = 0;
 my $offset = 1;
 my $extension = "fasta";
 my $read_length = $options->{'outrl'};
 if( exists $options->{'offset'} )   { $offset = $options->{'offset'}; }
 if( exists $options->{'extension'} ) { $extension = $options->{'extension'}; }
+if ( exists $options->{'trim'} ) { $trim = $options->{'trim'}; }
 
 # set filenames
 my $inputfile = $options->{'filestem'}.".".$extension;
@@ -136,8 +138,7 @@ sub cut_reads {
         next if($read_length > $mnsl);
 
         # easy to cut kmers
-        my $num_kmers = int (($mnsl - $read_length)/$offset) + 1;
-
+        my $num_kmers = int (($options->{'prerl'} - $read_length - $trim)/$offset) + 1;
         my $for_remaining = $for_len - $read_length;
         my $rev_remaining = $rev_len - $read_length;
 
